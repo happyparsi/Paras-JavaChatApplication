@@ -49,10 +49,10 @@ public class Server {
         userList.remove(user);
     }
     //Controls whether user exist or not
-    public static User isUserExist(String userName) {
+    public static boolean isUserExist(String userName) {
         for (User user : userList) {
             if (userName.equals(user.getName())){
-                return user;
+                return user.isUserOnline();
             }
         }
         return null;

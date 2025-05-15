@@ -11,90 +11,109 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import chat.app.UI.LoginFrame;
+import chat.app.UI.ModernChatFrame;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import static chat.app.Server.Server.isUserExist;
 
 public class DBManager {
-
     private static Connection con;
-    
+
     public static void ConnectDB() {
-        //Connect database
-        try{  
-                Class.forName("com.mysql.jdbc.Driver");  
-                con = (Connection) DriverManager.getConnection(  
-                "jdbc:mysql://127.0.0.1:3306/chatappdb","root","qwerasdf");  
-                 System.out.println("Database connection success");
-                } catch(ClassNotFoundException | SQLException e) { System.out.println(e);}  
-         } 
-
-    public static List<UserDB> GetUserList() throws SQLException{
-        String sql = "SELECT * FROM userlist";
-        Statement statement = con.createStatement();
-        ResultSet result = statement.executeQuery(sql);
-        
-        List<UserDB> resultList = new ArrayList<UserDB>();
-        
-        while(result.next()) {
-            resultList.add(new UserDB(result.getString(1), ""));
-        }
-
-        return resultList;
-    }
-
-    public static List<MessageDB> GetMessageList() throws SQLException{
-        String sql = "SELECT * FROM messageList";
-        Statement statement = (Statement) con.createStatement();
-        ResultSet result = statement.executeQuery(sql);
-        
-        List<MessageDB> resultList = new ArrayList<MessageDB>();
-        
-        while(result.next()) {
-            resultList.add(new MessageDB(result.getString(1), result.getString(2), result.getString(3), result.getString(4)));
-        }
-
-        return resultList;
-    }
-    
-    public static void InsertToUserList(UserDB user) throws SQLException{
-        String sql = "INSERT INTO userlist (username) VALUES (?)";
-        PreparedStatement statement = (PreparedStatement) con.prepareStatement(sql);
-        statement.setString(1, user.getUserName());
-        statement.executeUpdate();
-    }
-
-    public static void InsertToMessageList(MessageDB object) throws SQLException{
-        String sql = "INSERT INTO messagelist (sender, message, time, receiver) VALUES (?, ?, ?, ?)";
-        PreparedStatement statement = (PreparedStatement) con.prepareStatement(sql);
-        statement.setString(1, object.getSender());
-        statement.setString(2, object.getMessage());
-        statement.setString(3, object.getTime());
-        statement.setString(4, object.getReceiver());
-        statement.executeUpdate();
-    }
-    
-    public static void InsertManyMessageList(String message, String senderName) throws SQLException {
-        for (User member : Server.getServerUserList()) {
-            InsertToMessageList( 
-                    new MessageDB(senderName, message, Server.getServerTime(), member.getName()));
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            con = DriverManager.getConnection(
+                    "jdbc:mysql://127.0.0.1:3306/chatappdb?useSSL=false&allowPublicKeyRetrieval=true",
+                    "root",
+                    "rawal117"
+            );
+            System.out.println("Database connection success");
+        } catch (ClassNotFoundException | SQLException e) {
+            System.out.println("Database Error: " + e.getMessage());
         }
     }
-    
-    public static void InsertGroupMessageList(String message, String senderName, Group group) throws SQLException {
-        for (User member : group.getGroupUsers()) {
-            InsertToMessageList( 
-                    new MessageDB(senderName, message, Server.getServerTime(), member.getName()));
+
+    // Hash password using MD5
+    private static String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] messageDigest = md.digest(password.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : messageDigest) {
+                hexString.append(String.format("%02x", b));
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
         }
     }
-    
-    public static boolean isUserExist(String username) throws SQLException {
-        List<UserDB> userList = GetUserList();
-        
-        for ( UserDB user : userList) {
-            if (user.getUserName().equals(username)){
-                return true;
+
+    public static boolean registerUser(String username, String email, String password) {
+        try {
+            // Check if username already exists
+            if (isUserExist(username)) {
+                return false;
+            }
+
+            // Check if email already exists
+            String checkEmail = "SELECT COUNT(*) FROM userlist WHERE email = ?";
+            PreparedStatement checkStmt = con.prepareStatement(checkEmail);
+            checkStmt.setString(1, email);
+            ResultSet rs = checkStmt.executeQuery();
+            rs.next();
+            if (rs.getInt(1) > 0) {
+                return false;
+            }
+
+            // Insert new user
+            String sql = "INSERT INTO userlist (username, email, password_hash) VALUES (?, ?, ?)";
+            PreparedStatement statement = con.prepareStatement(sql);
+            statement.setString(1, username);
+            statement.setString(2, email);
+            statement.setString(3, hashPassword(password));
+            statement.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            System.out.println("Registration error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static boolean loginUser(String username, String password) {
+        try {
+            String sql = "SELECT password_hash FROM userlist WHERE username = ?";
+            PreparedStatement statement = con.prepareStatement(sql);
+            statement.setString(1, username);
+            ResultSet result = statement.executeQuery();
+
+            if (result.next()) {
+                String storedHash = result.getString("password_hash");
+                if (storedHash.equals(hashPassword(password))) {
+                    // Update last login and online status
+                    sql = "UPDATE userlist SET last_login = NOW(), is_online = TRUE WHERE username = ?";
+                    statement = con.prepareStatement(sql);
+                    statement.setString(1, username);
+                    statement.executeUpdate();
+                    return true;
                 }
-             }
-        return false;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.out.println("Login error: " + e.getMessage());
+            return false;
         }
-    
     }
 
+    // ... keep existing methods ...
+
+    private static void ensureConnected() throws SQLException {
+        if (con == null || con.isClosed()) {
+            ConnectDB();
+        }
+    }
+
+    public static List<UserDB> GetUserList() {
+    }
+}

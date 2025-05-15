@@ -1,0 +1,55 @@
+-- Create the database
+CREATE DATABASE IF NOT EXISTS chatappdb;
+USE chatappdb;
+
+-- Create users table
+CREATE TABLE IF NOT EXISTS userlist (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255),
+    email VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+-- Create message list table
+CREATE TABLE IF NOT EXISTS messagelist (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    sender VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    time TIMESTAMP NOT NULL,
+    receiver VARCHAR(50) NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (sender) REFERENCES userlist(username),
+    FOREIGN KEY (receiver) REFERENCES userlist(username)
+);
+
+-- ✅ Create groups table (with backticks)
+CREATE TABLE IF NOT EXISTS groups (
+    group_id INT AUTO_INCREMENT PRIMARY KEY,
+    group_name VARCHAR(50) NOT NULL,
+    created_by VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES userlist(username)
+);
+
+-- ✅ Create group members table
+CREATE TABLE IF NOT EXISTS group_members (
+    group_id INT,
+    username VARCHAR(50),
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_id, username),
+    FOREIGN KEY (group_id) REFERENCES groups(group_id),
+    FOREIGN KEY (username) REFERENCES userlist(username)
+);
+
+-- ✅ Create group messages table
+CREATE TABLE IF NOT EXISTS group_messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    sender VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(group_id),
+    FOREIGN KEY (sender) REFERENCES userlist(username)
+);
